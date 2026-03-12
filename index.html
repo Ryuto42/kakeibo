@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <title>家計簿</title>
+        <link rel="icon" href="icon.png" type="image/x-icon">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+
+        <div class="header">
+        <h1>家計簿</h1>
+        <div id="sync-status" class="sync-status"><i class="fa-solid fa-arrows-rotate fa-spin"></i> 更新中...</div>
+        
+        <div class="header-actions">
+            <div class="icon-btn active" id="btn-mode-calendar" onclick="toggleCalendarMode()">
+            <i id="icon-calendar-display" class="fa-regular fa-calendar"></i>
+            </div>
+            <div class="icon-btn" id="btn-mode-trend" onclick="showTrendMode()">
+            <i class="fa-solid fa-chart-line"></i>
+            </div>
+        </div>
+        </div>
+
+        <div id="loader"><i class="fa-solid fa-spinner fa-spin"></i> 読み込み中...</div>
+
+        <div class="content-wrapper" id="main-content" style="display:none;">
+
+        <div id="view-summary" class="summary-view fade-in-view">
+            <div class="date-nav-wrapper">
+            <div class="date-nav no-scrollbar" id="date-nav"></div>
+            </div>
+            <div class="toggle-container">
+            <div class="toggle-btn active" id="btn-expense" onclick="switchTab('支出')">支出</div>
+            <div class="toggle-btn" id="btn-income" onclick="switchTab('収入')">収入</div>
+            </div>
+            <div class="dashboard-top">
+            <div class="chart-area">
+                <canvas id="doughnutChart"></canvas>
+            </div>
+            <div class="stats-area">
+                <div class="stat-row">
+                <div class="stat-label">収入</div>
+                <div class="stat-value val-income" id="total-income">¥0</div>
+                </div>
+                <div class="stat-row">
+                <div class="stat-label">支出</div>
+                <div class="stat-value val-expense" id="total-expense">¥0</div>
+                </div>
+                <div class="stat-row">
+                <div class="stat-label">収支</div>
+                <div class="stat-value val-balance" id="total-balance">¥0</div>
+                <div class="stat-diff" id="diff-balance"></div>
+                </div>
+            </div>
+            </div>
+            <div id="category-list-container"></div>
+        </div>
+
+        <div id="view-trend" class="trend-view fade-in-view">
+            <div class="trend-card">
+            <div class="trend-title">資産推移 (現金残高)</div>
+            <div class="scrollable-chart-container no-scrollbar" id="trendScrollContainer">
+                <div class="chart-inner" id="lineChartWrapper">
+                <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+            </div>
+        </div>
+
+        <div id="view-detail" class="detail-view fade-in-view">
+            <div class="detail-title-header" id="detail-category-title">カテゴリ名</div>
+            <div class="detail-list" id="detail-list-content"></div>
+            <div class="back-btn-container">
+            <button class="back-btn" onclick="closeDetailView()">
+                <i class="fa-solid fa-xmark"></i> 閉じる
+            </button>
+            </div>
+        </div>
+
+        </div>
+
+        <script>
+        // ★★★ここにステップ1でコピーしたGASのウェブアプリURLを貼り付けます★★★
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwkyLkvVHwzil-hyINxabWDKX_VLxRNhmSeNMxX6lSlEFjx60uU-KfSBK51PGRqw8C4Uw/exec";
+
+        let globalData = [];
+        let appMode = 'summary'; 
+        let calendarMode = 'month'; 
+        let currentTab = '支出';
+        let currentSelection = '';
+        
+        let doughnutChart = null;
+        let lineChart = null;
+        let monthList = [];
+        let yearList = [];
+
+        const INITIAL_BALANCE = 163810;
+        const CACHE_KEY = 'kakeibo_cache_v1';
+
+        const warmPalette = [
+            '#e67e22', '#f1c40f', '#e17055', '#d63031', 
+            '#fdcb6e', '#b33939', '#fab1a0', '#d35400'
+        ];
+
+        function formatDateYM(date) {
+            const y = date.getFullYear();
+            const m = ('0' + (date.getMonth() + 1)).slice(-2);
+            return `${y}/${m}`;
+        }
+
+        // ★ データ取得のロジックを fetch API に変更
+        window.onload = async function() {
+            // キャッシュからの読み込み
+            const cachedStr = localStorage.getItem(CACHE_KEY);
+            if (cachedStr) {
+            try {
+                const cachedData = JSON.parse(cachedStr);
+                if (cachedData && cachedData.length > 0) {
+                initAppWithData(cachedData);
+                document.getElementById('sync-status').classList.add('show');
+                }
+            } catch(e) {}
+            }
+            
+            // GAS APIからデータを取得
+            try {
+            const response = await fetch(GAS_API_URL);
+            const newData = await response.json();
+            onServerDataLoaded(newData);
+            } catch (error) {
+            console.error('通信エラー:', error);
+            document.getElementById('loader').innerHTML = 'データの取得に失敗しました。<br>GASのURLが正しいか確認してください。';
+            }
+        };
+
+        // 以下の関数は元のDashboard.htmlから一切変更ありません
+        function onServerDataLoaded(newData) {
+            document.getElementById('sync-status').classList.remove('show');
+            const cachedStr = localStorage.getItem(CACHE_KEY);
+            const newStr = JSON.stringify(newData);
+
+            if (cachedStr !== newStr) {
+            localStorage.setItem(CACHE_KEY, newStr);
+            const savedSelection = currentSelection;
+            initAppWithData(newData);
+            if (savedSelection && (monthList.includes(savedSelection) || yearList.includes(savedSelection))) {
+                currentSelection = savedSelection;
+                refreshCurrentView();
+            }
+            } else {
+            if (globalData.length === 0 && newData.length > 0) {
+                initAppWithData(newData);
+            } else if (globalData.length === 0) {
+                initAppWithData([]);
+            }
+            document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        function initAppWithData(data) {
+            globalData = data;
+            extractDates();
+            if(!currentSelection || (!monthList.includes(currentSelection) && !yearList.includes(currentSelection))) {
+            currentSelection = monthList.length > 0 ? monthList[monthList.length - 1] : '';
+            if(!currentSelection) currentSelection = formatDateYM(new Date());
+            }
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            setTimeout(refreshCurrentView, 0);
+        }
+
+        function refreshCurrentView() {
+            if (appMode === 'summary') {
+            renderSummaryView();
+            } else if (appMode === 'trend') {
+            renderTrendView();
+            } else if (appMode === 'detail') {
+            const currentCat = document.getElementById('detail-category-title').textContent;
+            renderDetailList(currentCat);
+            }
+        }
+
+        function animateValue(id, start, end, duration, formatFn) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            
+            let startTimestamp = null;
+            const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+            const currentVal = Math.floor(start + (end - start) * easeProgress);
+            obj.textContent = formatFn ? formatFn(currentVal) : currentVal;
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function toggleCalendarMode() {
+            if (appMode === 'trend' || appMode === 'detail') {
+            appMode = 'summary';
+            calendarMode = 'month';
+            } else {
+            calendarMode = (calendarMode === 'month') ? 'year' : 'month';
+            }
+            updateSelectionForMode();
+            updateUI();
+        }
+
+        function showTrendMode() {
+            if (appMode === 'trend') return;
+            appMode = 'trend';
+            updateUI();
+            renderTrendView();
+        }
+
+        function showDetailView(categoryName) {
+            appMode = 'detail';
+            updateUI();
+            renderDetailList(categoryName);
+        }
+
+        function closeDetailView() {
+            appMode = 'summary';
+            updateUI();
+        }
+
+        function updateSelectionForMode() {
+            if (calendarMode === 'month') {
+            currentSelection = monthList.length > 0 ? monthList[monthList.length - 1] : '';
+            } else {
+            currentSelection = yearList.length > 0 ? yearList[yearList.length - 1] : '';
+            }
+            if(!currentSelection) currentSelection = formatDateYM(new Date());
+        }
+
+        function updateUI() {
+            document.getElementById('view-summary').style.display = (appMode === 'summary') ? 'block' : 'none';
+            document.getElementById('view-trend').style.display = (appMode === 'trend') ? 'block' : 'none';
+            document.getElementById('view-detail').style.display = (appMode === 'detail') ? 'block' : 'none';
+
+            const btnCal = document.getElementById('btn-mode-calendar');
+            const btnTrend = document.getElementById('btn-mode-trend');
+            const iconCal = document.getElementById('icon-calendar-display');
+
+            if (appMode === 'summary') {
+            btnCal.classList.add('active');
+            btnTrend.classList.remove('active');
+            iconCal.className = (calendarMode === 'month') ? 'fa-regular fa-calendar' : 'fa-solid fa-calendar-days';
+            setTimeout(renderSummaryView, 0);
+            } else if (appMode === 'trend') {
+            btnCal.classList.remove('active');
+            btnTrend.classList.add('active');
+            iconCal.className = 'fa-regular fa-calendar';
+            } else {
+            btnCal.classList.remove('active');
+            btnTrend.classList.remove('active');
+            }
+        }
+
+        function extractDates() {
+            const uniqueMonths = new Set();
+            const uniqueYears = new Set();
+            globalData.forEach(d => {
+            uniqueMonths.add(d.date.substring(0, 7));
+            uniqueYears.add(d.date.substring(0, 4));
+            });
+            monthList = Array.from(uniqueMonths).sort();
+            yearList = Array.from(uniqueYears).sort();
+        }
+
+        function getColorForCategory(name, index) {
+            if (name.includes('未分類') || name.includes('その他')) return '#7f8c8d';
+            if (currentTab === '収入') {
+            if (name.includes('給与')) return '#4ECDC4'; 
+            if (name.includes('立て替え') || name.includes('立替')) return '#81ecec'; 
+            return '#e0e0e0'; 
+            }
+            if (name.includes('現金') || name.includes('カード')) return '#e84118';
+            if (name.includes('税')) return '#7f8c8d';
+            return warmPalette[index % warmPalette.length];
+        }
+
+        function getIconClass(name) {
+            if (name.includes('現金') || name.includes('カード')) return 'fa-wallet';
+            if (name.includes('税') || name.includes('保険')) return 'fa-file-invoice-dollar';
+            if (name.includes('食')) return 'fa-utensils';
+            if (name.includes('交通')) return 'fa-train';
+            if (name.includes('住')) return 'fa-house';
+            if (name.includes('給与')) return 'fa-money-bill-wave';
+            if (name.includes('その他入金') || name.includes('収入')) return 'fa-coins';
+            return 'fa-shapes'; 
+        }
+
+        function renderSummaryView() {
+            renderNav(true);
+            renderSummaryData();
+        }
+
+        function renderNav(scrollToEnd = false) {
+            const nav = document.getElementById('date-nav');
+            nav.innerHTML = '';
+            const list = (calendarMode === 'month') ? monthList : yearList;
+            let activeEl = null;
+
+            if (list.length === 0) {
+            const now = new Date();
+            const val = calendarMode === 'month' ? formatDateYM(now) : now.getFullYear().toString();
+            list.push(val);
+            }
+
+            list.forEach(val => {
+            const span = document.createElement('span');
+            if (calendarMode === 'month') {
+                const parts = val.split('/');
+                span.textContent = `${parts[0]}年${Number(parts[1])}月`;
+            } else {
+                span.textContent = `${val}年`;
+            }
+            
+            span.onclick = () => {
+                currentSelection = val;
+                updateNavActiveState(nav, val); 
+                renderSummaryData();
+            };
+
+            if (val === currentSelection) {
+                span.classList.add('active');
+                activeEl = span;
+                const color = currentTab === '支出' ? '#e84118' : '#4ECDC4';
+                span.style.borderColor = color;
+                span.style.color = color;
+            }
+            nav.appendChild(span);
+            });
+
+            if (scrollToEnd) {
+            setTimeout(() => { nav.scrollLeft = nav.scrollWidth; }, 0);
+            } else if (activeEl) {
+            setTimeout(() => {
+                activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }, 0);
+            }
+        }
+
+        function updateNavActiveState(nav, selection) {
+            const spans = nav.querySelectorAll('span');
+            const list = (calendarMode === 'month') ? monthList : yearList;
+            if (list.length === 0) {
+            const now = new Date();
+            const val = calendarMode === 'month' ? formatDateYM(now) : now.getFullYear().toString();
+            if(val === selection && spans[0]) {
+                spans[0].classList.add('active');
+                const color = currentTab === '支出' ? '#e84118' : '#4ECDC4';
+                spans[0].style.borderColor = color;
+                spans[0].style.color = color;
+            }
+            return;
+            }
+
+            spans.forEach((span, index) => {
+            if (list[index] === selection) {
+                span.classList.add('active');
+                const color = currentTab === '支出' ? '#e84118' : '#4ECDC4';
+                span.style.borderColor = color;
+                span.style.color = color;
+                span.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            } else {
+                span.classList.remove('active');
+                span.style.borderColor = 'transparent';
+                span.style.color = '';
+            }
+            });
+        }
+
+        function switchTab(type) {
+            currentTab = type;
+            const btnExp = document.getElementById('btn-expense');
+            const btnInc = document.getElementById('btn-income');
+
+            btnExp.className = 'toggle-btn'; btnExp.style.background = '#2a2a2a';
+            btnInc.className = 'toggle-btn'; btnInc.style.background = '#2a2a2a';
+
+            if (type === '支出') {
+                btnExp.classList.add('active');
+                btnExp.style.background = '#e84118';
+            } else {
+                btnInc.classList.add('active');
+                btnInc.style.background = '#4ECDC4';
+            }
+            
+            const nav = document.getElementById('date-nav');
+            updateNavActiveState(nav, currentSelection);
+            renderSummaryData();
+        }
+
+        function getPreviousPeriodKey(current, mode) {
+            if (!current) return null;
+            if (mode === 'month') {
+            let parts = current.split('/');
+            let year = parseInt(parts[0]);
+            let month = parseInt(parts[1]) - 1; 
+            let prevDate = new Date(year, month - 1, 1); 
+            return formatDateYM(prevDate);
+            } else {
+            let year = parseInt(current);
+            return (year - 1).toString();
+            }
+        }
+
+        function renderSummaryData() {
+            const periodData = globalData.filter(d => d.date.startsWith(currentSelection));
+            let totalIncome = 0;
+            let totalExpense = 0;
+            
+            periodData.forEach(d => {
+            if (d.type === '収入') totalIncome += d.amount;
+            if (d.type === '支出') totalExpense += d.amount;
+            });
+
+            const currentBalance = totalIncome - totalExpense;
+
+            animateValue('total-income', 0, totalIncome, 800, (v) => '¥' + v.toLocaleString());
+            animateValue('total-expense', 0, totalExpense, 800, (v) => '¥' + v.toLocaleString());
+            animateValue('total-balance', 0, currentBalance, 800, (v) => '¥' + v.toLocaleString());
+
+            const prevKey = getPreviousPeriodKey(currentSelection, calendarMode);
+            const prevData = globalData.filter(d => d.date.startsWith(prevKey));
+            let prevIncome = 0, prevExpense = 0;
+            prevData.forEach(d => {
+            if (d.type === '収入') prevIncome += d.amount;
+            if (d.type === '支出') prevExpense += d.amount;
+            });
+            const diff = currentBalance - (prevIncome - prevExpense);
+            const diffEl = document.getElementById('diff-balance');
+            let sign = diff >= 0 ? '+' : '';
+            let periodName = calendarMode === 'month' ? '前月比' : '前年比';
+            diffEl.textContent = (prevData.length > 0) ? `(${periodName} ${sign}¥${diff.toLocaleString()})` : `(${periodName} データなし)`;
+
+            const filteredData = periodData.filter(d => d.type === currentTab);
+            const listContainer = document.getElementById('category-list-container');
+            listContainer.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                drawDoughnut([], [], []);
+                listContainer.innerHTML = `<div class="no-data">データがありません</div>`;
+                return;
+            }
+
+            let categoryGroup = {};
+            filteredData.forEach(d => {
+            let parts = d.category ? d.category.split('/') : ['未分類', 'その他'];
+            let mainCat = parts[0].trim();
+            let subCat = parts.length > 1 ? parts[1].trim() : 'その他';
+
+            if (currentTab === '収入') {
+                mainCat = subCat; 
+                subCat = '-'; 
+            }
+
+            if (!categoryGroup[mainCat]) {
+                categoryGroup[mainCat] = { total: 0, subs: {} };
+            }
+            categoryGroup[mainCat].total += d.amount;
+            
+            if (subCat !== '-') {
+                if (!categoryGroup[mainCat].subs[subCat]) categoryGroup[mainCat].subs[subCat] = 0;
+                categoryGroup[mainCat].subs[subCat] += d.amount;
+            }
+            });
+
+            let sortedCategories = Object.keys(categoryGroup).map(key => {
+            return { name: key, data: categoryGroup[key] };
+            }).sort((a, b) => b.data.total - a.data.total);
+
+            let chartLabels = [];
+            let chartData = [];
+            let chartColors = [];
+            const targetTotal = currentTab === '収入' ? totalIncome : totalExpense;
+
+            sortedCategories.forEach((cat, index) => {
+            let color = getColorForCategory(cat.name, index);
+            chartLabels.push(cat.name);
+            chartData.push(cat.data.total);
+            chartColors.push(color);
+
+            let percent = targetTotal > 0 ? (cat.data.total / targetTotal * 100).toFixed(1) : 0;
+            let subsHtml = '';
+            Object.keys(cat.data.subs).forEach(subKey => {
+                subsHtml += `
+                <div class="sub-item">
+                    <span>${subKey}</span>
+                    <span>¥${cat.data.subs[subKey].toLocaleString()}</span>
+                </div>`;
+            });
+
+            const delay = index * 0.08; 
+            let html = `
+                <div class="category-item animate-in" style="animation-delay: ${delay}s" onclick="showDetailView('${cat.name}')">
+                <div class="cat-header">
+                    <div class="icon-box" style="background-color: ${color}; box-shadow: 0 0 10px ${color}66;">
+                    <i class="fa-solid ${getIconClass(cat.name)}"></i>
+                    </div>
+                    <div class="cat-info">
+                    <div class="cat-name">${cat.name}</div>
+                    </div>
+                    <div>
+                    <div class="cat-total">¥${cat.data.total.toLocaleString()}</div>
+                    <div class="cat-percent-val">${percent}%</div>
+                    </div>
+                </div>
+                <div class="sub-list">
+                    ${subsHtml}
+                </div>
+                </div>
+            `;
+            listContainer.innerHTML += html;
+            });
+            drawDoughnut(chartLabels, chartData, chartColors);
+        }
+
+        function drawDoughnut(labels, data, colors) {
+            const ctx = document.getElementById('doughnutChart').getContext('2d');
+            if (doughnutChart) doughnutChart.destroy();
+            
+            let isEmpty = false;
+            if (data.length === 0) {
+                labels = ['データなし']; data = [1]; colors = ['#333'];
+                isEmpty = true;
+            }
+
+            doughnutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 0,
+                }]
+            },
+            options: {
+                cutout: '70%',
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 800,
+                easing: 'easeOutQuart'
+                },
+                plugins: {
+                legend: { display: false },
+                tooltip: {
+                    enabled: !isEmpty,
+                    backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                    bodyColor: '#fff',
+                }
+                }
+            }
+            });
+        }
+
+        function renderTrendView() {
+            if (monthList.length === 0) return;
+            let labels = [];
+            let balanceData = [];
+            let cumulativeBalance = INITIAL_BALANCE; 
+
+            monthList.forEach(m => {
+            let monthlyIncome = 0;
+            let monthlyExpense = 0;
+            globalData.filter(d => d.date.startsWith(m)).forEach(d => {
+                if (d.type === '収入') monthlyIncome += d.amount;
+                if (d.type === '支出') monthlyExpense += d.amount;
+            });
+            cumulativeBalance += (monthlyIncome - monthlyExpense);
+            let parts = m.split('/');
+            labels.push(parts[0].slice(2) + '/' + Number(parts[1]));
+            balanceData.push(cumulativeBalance);
+            });
+            drawLineChart(labels, balanceData);
+        }
+
+        function drawLineChart(labels, data) {
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            const wrapper = document.getElementById('lineChartWrapper');
+            const scrollContainer = document.getElementById('trendScrollContainer');
+            const minWidth = 600; 
+            const dynamicWidth = Math.max(minWidth, labels.length * 60);
+            wrapper.style.width = dynamicWidth + 'px';
+
+            if (lineChart) lineChart.destroy();
+            lineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                label: '現金残高 (累積)',
+                data: data,
+                borderColor: '#fbc531',
+                backgroundColor: 'rgba(251, 197, 49, 0.1)',
+                borderWidth: 3,
+                pointBackgroundColor: '#fbc531',
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1200,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                    callbacks: {
+                    label: function(context) {
+                        return ' 残高: ¥' + context.raw.toLocaleString();
+                    }
+                    }
+                }
+                },
+                scales: {
+                x: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                y: { position: 'right', grid: { color: '#333' }, ticks: { color: '#aaa' } }
+                }
+            }
+            });
+            setTimeout(() => {
+            scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+            }, 0);
+        }
+
+        function renderDetailList(categoryName) {
+            document.getElementById('detail-category-title').textContent = categoryName;
+            const listEl = document.getElementById('detail-list-content');
+            listEl.innerHTML = '';
+
+            const filteredData = globalData.filter(d => {
+            if (!d.date.startsWith(currentSelection)) return false;
+            if (d.type !== currentTab) return false;
+
+            let parts = d.category ? d.category.split('/') : ['未分類', 'その他'];
+            let mainCat = parts[0].trim();
+            let subCat = parts.length > 1 ? parts[1].trim() : 'その他';
+
+            let key = (currentTab === '収入') ? subCat : mainCat;
+            return key === categoryName;
+            });
+
+            filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (filteredData.length === 0) {
+            listEl.innerHTML = '<div class="no-data">データがありません</div>';
+            return;
+            }
+
+            const color = (currentTab === '収入') ? '#4ECDC4' : '#e84118';
+
+            filteredData.forEach((d, index) => {
+            const delay = index * 0.05;
+            let html = `
+                <div class="detail-row" style="animation-delay: ${delay}s">
+                <div class="detail-left">
+                    <div class="detail-date">${d.date}</div>
+                    <div class="detail-desc">${d.description}</div>
+                </div>
+                <div class="detail-amount" style="color: ${color}">¥${d.amount.toLocaleString()}</div>
+                </div>
+            `;
+            listEl.innerHTML += html;
+            });
+        }
+        </script>
+    </body>
+</html>
