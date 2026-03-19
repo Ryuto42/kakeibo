@@ -11,19 +11,26 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-
-        <div class="header">
-        <h1>家計簿</h1>
-        <div id="sync-status" class="sync-status"><i class="fa-solid fa-arrows-rotate fa-spin"></i> 更新中...</div>
-        
-        <div class="header-actions">
-            <div class="icon-btn active" id="btn-mode-calendar" onclick="toggleCalendarMode()">
-            <i id="icon-calendar-display" class="fa-regular fa-calendar"></i>
-            </div>
-            <div class="icon-btn" id="btn-mode-trend" onclick="showTrendMode()">
-            <i class="fa-solid fa-chart-line"></i>
+        <div id="password-overlay" class="password-overlay">
+            <div class="password-box">
+                <h2>家計簿ログイン</h2>
+                <input type="password" id="password-input" placeholder="パスワードを入力">
+                <button onclick="checkPassword()">ログイン</button>
+                <p id="password-error">パスワードが間違っています</p>
             </div>
         </div>
+
+        <div class="header" id="app-header" style="display: none;">
+            <h1>家計簿</h1>
+            <div id="sync-status" class="sync-status"><i class="fa-solid fa-arrows-rotate fa-spin"></i> 更新中...</div>
+            <div class="header-actions">
+                <div class="icon-btn active" id="btn-mode-calendar" onclick="toggleCalendarMode()">
+                <i id="icon-calendar-display" class="fa-regular fa-calendar"></i>
+                </div>
+                <div class="icon-btn" id="btn-mode-trend" onclick="showTrendMode()">
+                <i class="fa-solid fa-chart-line"></i>
+                </div>
+            </div>
         </div>
 
         <div id="loader"><i class="fa-solid fa-spinner fa-spin"></i> 読み込み中...</div>
@@ -85,8 +92,9 @@
         </div>
 
         <script>
-        // ★★★ここにステップ1でコピーしたGASのウェブアプリURLを貼り付けます★★★
+        //GAS
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwkyLkvVHwzil-hyINxabWDKX_VLxRNhmSeNMxX6lSlEFjx60uU-KfSBK51PGRqw8C4Uw/exec";
+        const APP_PASSWORD = "ryuto42";
 
         let globalData = [];
         let appMode = 'summary'; 
@@ -113,9 +121,30 @@
             return `${y}/${m}`;
         }
 
-        // ★ データ取得のロジックを fetch API に変更
-        window.onload = async function() {
-            // キャッシュからの読み込み
+        window.onload = function() {
+            if (localStorage.getItem('kakeibo_auth_v1') === 'true') {
+                document.getElementById('password-overlay').style.display = 'none';
+                document.getElementById('app-header').style.display = 'flex';
+                document.getElementById('loader').style.display = 'block';
+                startApp();
+            }
+        };
+
+        function checkPassword() {
+            const input = document.getElementById('password-input').value;
+            if (input === APP_PASSWORD) {
+                localStorage.setItem('kakeibo_auth_v1', 'true');
+                document.getElementById('password-overlay').style.display = 'none';
+                document.getElementById('app-header').style.display = 'flex';
+                document.getElementById('loader').style.display = 'block';
+                startApp();
+            } else {
+                document.getElementById('password-error').style.display = 'block';
+            }
+        }
+
+        async function startApp() {
+            //キャッシュからの読み込み
             const cachedStr = localStorage.getItem(CACHE_KEY);
             if (cachedStr) {
             try {
@@ -126,8 +155,7 @@
                 }
             } catch(e) {}
             }
-            
-            // GAS APIからデータを取得
+            //APIから取得
             try {
             const response = await fetch(GAS_API_URL);
             const newData = await response.json();
@@ -136,9 +164,8 @@
             console.error('通信エラー:', error);
             document.getElementById('loader').innerHTML = 'データの取得に失敗しました。<br>GASのURLが正しいか確認してください。';
             }
-        };
-
-        // 以下の関数は元のDashboard.htmlから一切変更ありません
+        }
+        
         function onServerDataLoaded(newData) {
             document.getElementById('sync-status').classList.remove('show');
             const cachedStr = localStorage.getItem(CACHE_KEY);
