@@ -9,6 +9,12 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         
         <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="stylesheet" href="style.css">
+        
+        <link rel="manifest" href="manifest.json">
+        <meta name="theme-color" content="#1e1e1e">
+        <link rel="apple-touch-icon" href="icon.png">
     </head>
     <body>
         <div id="password-overlay" class="password-overlay">
@@ -710,6 +716,18 @@
                 </div>
             `;
             listEl.innerHTML += html;
+            });
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker 登録成功:', registration.scope);
+                    })
+                    .catch((err) => {
+                        console.log('ServiceWorker 登録失敗:', err);
+                    });
             });
         }
         </script>
