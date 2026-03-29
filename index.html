@@ -4,13 +4,14 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <title>家計簿</title>
-        <link rel="icon" href="icon.png" type="image/x-icon">
+        <link rel="icon" href="icon.png" type="image/png">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         
         <link rel="stylesheet" href="style.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link rel="stylesheet" href="style.css">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="家計簿">
         
         <link rel="manifest" href="manifest.json">
         <meta name="theme-color" content="#1e1e1e">
@@ -150,7 +151,6 @@
         }
 
         async function startApp() {
-            //キャッシュからの読み込み
             const cachedStr = localStorage.getItem(CACHE_KEY);
             if (cachedStr) {
             try {
@@ -161,7 +161,6 @@
                 }
             } catch(e) {}
             }
-            //APIから取得
             try {
             const response = await fetch(GAS_API_URL);
             const newData = await response.json();
@@ -721,7 +720,7 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
+                navigator.serviceWorker.register('./sw.js', { scope: './' })
                     .then((registration) => {
                         console.log('ServiceWorker 登録成功:', registration.scope);
                     })

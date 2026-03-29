@@ -17,6 +17,8 @@ body {
     padding: 0;
     height: 100vh;
     overflow-y: auto; 
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -54,8 +56,8 @@ body {
 .date-nav span.active { color: var(--text-main); border-bottom: 3px solid transparent; }
 
 .toggle-container { background: var(--card-bg); padding: 10px 0 25px 0; display: flex; justify-content: center; gap: 15px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; margin-bottom: 20px; }
-.toggle-btn { padding: 8px 30px; border-radius: 30px; font-size: 0.9rem; cursor: pointer; color: var(--text-sub); font-weight: bold; background: #2a2a2a; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
-.toggle-btn:active { transform: scale(0.95); }
+.toggle-btn { padding: 8px 30px; border-radius: 30px; font-size: 0.9rem; cursor: pointer; color: var(--text-sub); font-weight: bold; background: #2a2a2a; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); user-select: none; }
+.toggle-btn:active { transform: scale(0.92); opacity: 0.8; }
 .toggle-btn.active { color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
 .dashboard-top { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); border-radius: 16px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); animation: slideInUp 0.5s ease-out; }
@@ -98,9 +100,9 @@ body {
 .detail-desc { font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
 .detail-amount { font-size: 1rem; font-weight: bold; }
 
-.back-btn-container { position: fixed; bottom: 20px; left: 0; width: 100%; display: flex; justify-content: center; z-index: 200; pointer-events: none; animation: fadeIn 0.5s 0.2s backwards; }
-.back-btn { pointer-events: auto; background: #333; color: #fff; padding: 12px 40px; border-radius: 30px; border: 1px solid #555; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-.back-btn:active { transform: scale(0.95); background: #444; }
+.back-btn-container { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 0; width: 100%; display: flex; justify-content: center; z-index: 200; pointer-events: none; animation: fadeIn 0.5s 0.2s backwards; }
+.back-btn { pointer-events: auto; background: #333; color: #fff; padding: 12px 40px; border-radius: 30px; border: 1px solid #555; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; user-select: none; }
+.back-btn:active { transform: scale(0.92); background: #444; opacity: 0.8; }
 
 .no-data { text-align: center; padding: 40px 0; color: var(--text-sub); }
 #loader { text-align: center; margin-top: 60px; color: var(--text-sub); }
