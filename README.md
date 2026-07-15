@@ -1,1 +1,1 @@
-This site is hosted on Cloudflare Pages (deployed from this GitHub repository). The database is stored in a private repository. Access is protected by Cloudflare Access (Zero Trust), requiring a one-time email passcode sent to an authorized address.
+This site is hosted on Cloudflare Pages (deployed from this GitHub repository) at https://kakeibo-d9w.pages.dev. The database is stored in a private repository. Access is protected by Cloudflare Access (Zero Trust), requiring a one-time email passcode sent to an authorized address.
