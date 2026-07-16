@@ -1,9 +1,10 @@
-const CACHE_NAME = 'kakeibo-pwa-v3';
+const CACHE_NAME = 'kakeibo-pwa-v4';
 const STATIC_ASSETS = [
     './',
     './index.html',
     './style.css',
     './icon.png',
+    './icon-512.png',
     'https://cdn.jsdelivr.net/npm/chart.js',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
