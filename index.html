@@ -14,8 +14,6 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="家計簿">
 
-        <!-- Cloudflare Access の後ろに置いているため、認証Cookieを付けて取得させる。
-             これがないとマニフェストがログイン画面へリダイレクトされ、インストールできない -->
         <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
         <meta name="theme-color" content="#000000">
         <link rel="apple-touch-icon" href="icon.png">
@@ -36,30 +34,32 @@
 
             <!-- ホーム -->
             <section id="screen-home" class="screen">
-                <div class="balance-card">
-                    <div class="balance-label">現在の資産残高</div>
-                    <div class="balance-value" id="home-balance">¥0</div>
-                    <div class="balance-sub" id="home-balance-sub"></div>
-                </div>
+                <button class="balance-card tappable" onclick="showScreen('assets')">
+                    <span class="balance-label">現在の資産残高</span>
+                    <span class="balance-value" id="home-balance">¥0</span>
+                    <span class="balance-sub" id="home-balance-sub"></span>
+                    <i class="fa-solid fa-chevron-right balance-chevron"></i>
+                </button>
 
                 <div class="section-head" id="home-month-head">今月の収支</div>
-                <div class="dashboard dashboard-sm">
-                    <div class="chart-area"><canvas id="homeDoughnut"></canvas></div>
-                    <div class="stats">
-                        <div class="stat-row">
-                            <div class="stat-label">収入</div>
-                            <div class="stat-value val-income" id="home-income">¥0</div>
-                        </div>
-                        <div class="stat-row">
-                            <div class="stat-label">支出</div>
-                            <div class="stat-value val-expense" id="home-expense">¥0</div>
-                        </div>
-                        <div class="stat-row">
-                            <div class="stat-label">収支</div>
-                            <div class="stat-value" id="home-net">¥0</div>
-                            <div class="stat-diff" id="home-diff"></div>
-                        </div>
+                <div class="month-summary">
+                    <div class="ms-row">
+                        <button class="ms-item" onclick="showMonthBreakdown('収入')">
+                            <span class="ms-label">収入</span>
+                            <span class="ms-value val-income" id="home-income">¥0</span>
+                        </button>
+                        <button class="ms-item" onclick="showMonthBreakdown('支出')">
+                            <span class="ms-label">支出</span>
+                            <span class="ms-value val-expense" id="home-expense">¥0</span>
+                        </button>
                     </div>
+                    <button class="ms-net" onclick="showMonthBreakdown('net')">
+                        <span class="ms-label">収支</span>
+                        <span class="ms-net-right">
+                            <span class="ms-value" id="home-net">¥0</span>
+                            <i class="fa-solid fa-chevron-right ms-chevron"></i>
+                        </span>
+                    </button>
                 </div>
 
                 <div class="section-head">最近の入出履歴</div>
@@ -104,6 +104,11 @@
                 </div>
 
                 <div id="category-list-container"></div>
+
+                <div class="card card-mt">
+                    <div class="card-title">月次の収支推移</div>
+                    <div class="bar-chart-area"><canvas id="monthlyBarChart"></canvas></div>
+                </div>
             </section>
 
             <!-- 資産 -->
@@ -134,17 +139,46 @@
                 </div>
             </section>
 
-            <!-- カテゴリ詳細 -->
-            <section id="screen-detail" class="screen">
-                <div class="detail-head">
-                    <button class="back-link" onclick="closeDetailView()">
-                        <i class="fa-solid fa-chevron-left"></i> 戻る
-                    </button>
-                    <span class="detail-title" id="detail-category-title"></span>
+            <!-- 目標 -->
+            <section id="screen-goal" class="screen">
+                <div class="balance-card">
+                    <div class="balance-label">現在の資産残高</div>
+                    <div class="balance-value" id="goal-balance">¥0</div>
+                    <div class="balance-sub" id="goal-progress-text">目標を設定してください</div>
+                    <div class="progress"><div class="progress-bar" id="goal-progress-bar"></div></div>
                 </div>
-                <div class="list-card" id="detail-list-content"></div>
+
+                <div class="card">
+                    <div class="card-title">目標の設定</div>
+                    <label class="field">
+                        <span class="field-label">目標金額</span>
+                        <input class="field-input" type="number" id="goal-amount"
+                               inputmode="numeric" placeholder="1000000">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">達成したい時期</span>
+                        <input class="field-input" type="month" id="goal-month">
+                    </label>
+                </div>
+
+                <div id="goal-result"></div>
             </section>
 
+        </div>
+
+        <!-- カテゴリ詳細（ポップアップ） -->
+        <div class="sheet-backdrop" id="detail-sheet" onclick="onSheetBackdrop(event)">
+            <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="detail-category-title">
+                <div class="sheet-handle"></div>
+                <div class="sheet-head">
+                    <span class="sheet-title" id="detail-category-title"></span>
+                    <button class="sheet-close" onclick="closeDetailView()" aria-label="閉じる">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="sheet-body" id="detail-list-content"></div>
+                <div class="sheet-foot" id="sheet-foot"></div>
+            </div>
         </div>
 
         <nav class="tabbar">
@@ -159,6 +193,9 @@
                 <button class="tab-btn" data-tab="assets" onclick="showScreen('assets')" aria-label="資産">
                     <i class="fa-solid fa-chart-line"></i>
                 </button>
+                <button class="tab-btn" data-tab="goal" onclick="showScreen('goal')" aria-label="目標">
+                    <i class="fa-solid fa-bullseye"></i>
+                </button>
             </div>
         </nav>
 
@@ -169,8 +206,12 @@
         const INITIAL_BALANCE = 163810;
         const CACHE_KEY = 'kakeibo_cache_v1';
 
-        const SCREEN_TITLES = { home: 'ホーム', kakeibo: '家計簿', assets: '資産', detail: '家計簿' };
-        const TAB_ORDER = ['home', 'kakeibo', 'assets'];
+        const SCREEN_TITLES = { home: 'ホーム', kakeibo: '家計簿', assets: '資産', goal: '目標' };
+        const TAB_ORDER = ['home', 'kakeibo', 'assets', 'goal'];
+        const SCREENS = ['home', 'kakeibo', 'assets', 'goal'];
+        const GOAL_KEY = 'kakeibo_goal_v1';
+        // 収支のブレが大きいので、ペースは直近12ヶ月の平均で見る
+        const PACE_MONTHS = 12;
 
         let globalData = [];
         let currentScreen = 'home';
@@ -179,6 +220,7 @@
         let currentSelection = '';
         let currentCategories = [];
         let currentDetailCategory = '';
+        let sheetContext = null;
         let assetRange = '1y';
         let assetSeries = { labels: [], values: [] };
         let assetVisible = 0;
@@ -187,8 +229,8 @@
         let historyOpen = false;
 
         let doughnutChart = null;
-        let homeDoughnutChart = null;
         let lineChart = null;
+        let monthlyBarChart = null;
         let monthList = [];
         let yearList = [];
 
@@ -291,11 +333,11 @@
         /* 画面切り替え */
 
         function showScreen(name) {
-            const isDetailBack = (currentScreen === 'detail' && name === 'kakeibo');
             const changed = currentScreen !== name;
+            closeDetailView();
             currentScreen = name;
 
-            ['home', 'kakeibo', 'assets', 'detail'].forEach(s => {
+            SCREENS.forEach(s => {
                 const el = document.getElementById('screen-' + s);
                 el.classList.toggle('active', s === name);
                 if (s === name) {
@@ -307,13 +349,13 @@
 
             document.getElementById('screen-title').textContent = SCREEN_TITLES[name];
             document.getElementById('cal-seg').style.display = (name === 'kakeibo') ? 'flex' : 'none';
-            updateTabBar(changed || isDetailBack);
+            updateTabBar(changed);
             window.scrollTo({ top: 0, behavior: 'auto' });
             renderCurrentScreen();
         }
 
         function updateTabBar(animateCapsule) {
-            const activeTab = (currentScreen === 'detail') ? 'kakeibo' : currentScreen;
+            const activeTab = currentScreen;
             const index = Math.max(0, TAB_ORDER.indexOf(activeTab));
 
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -336,7 +378,9 @@
             if (currentScreen === 'home') renderHome();
             else if (currentScreen === 'kakeibo') renderKakeibo();
             else if (currentScreen === 'assets') renderAssets();
-            else if (currentScreen === 'detail') renderDetailList(currentDetailCategory);
+            else if (currentScreen === 'goal') renderGoal();
+            // ポップアップを開いたままデータが更新された場合も中身を追従させる
+            if (isDetailOpen()) refreshSheet();
         }
 
         /* 共通計算 */
@@ -509,21 +553,6 @@
             document.getElementById('home-net').style.color =
                 totals.net >= 0 ? 'var(--net-plus)' : 'var(--net-minus)';
 
-            const prev = periodTotals(getPreviousPeriodKey(latestMonth, 'month'));
-            const diff = totals.net - prev.net;
-            document.getElementById('home-diff').textContent = prev.count > 0
-                ? `前月比 ${diff >= 0 ? '+' : '-'}¥${Math.abs(diff).toLocaleString()}`
-                : '前月比 データなし';
-
-            // 支出の内訳をそのままドーナツにする（家計簿画面と同じ見た目の小型版）
-            const expenseCats = groupByCategory(
-                globalData.filter(d => d.date && d.date.startsWith(latestMonth) && d.type === '支出'), '支出');
-            if (homeDoughnutChart) { homeDoughnutChart.destroy(); homeDoughnutChart = null; }
-            homeDoughnutChart = makeDoughnut('homeDoughnut',
-                expenseCats.map(c => c.name),
-                expenseCats.map(c => c.data.total),
-                expenseCats.map((c, i) => getColorForCategory(c.name, i, '支出')));
-
             const rows = sortedDesc.slice(0, 30);
             const listEl = document.getElementById('home-history');
             const moreEl = document.getElementById('home-history-more');
@@ -580,6 +609,116 @@
             document.getElementById('btn-income').classList.toggle('active', currentTab === '収入');
             renderNav();
             renderSummaryData();
+            renderMonthlyBars();
+        }
+
+        function monthlyWindow(count) {
+            if (monthList.length === 0) return { months: [], selected: -1 };
+
+            let idx = -1;
+            if (calendarMode === 'month') {
+                idx = monthList.indexOf(currentSelection);
+            } else {
+                // 年で見ているときはその年の最後の月に合わせる
+                monthList.forEach((m, i) => { if (m.startsWith(currentSelection)) idx = i; });
+            }
+            if (idx < 0) idx = monthList.length - 1;
+
+            let start = idx - Math.floor(count / 2);
+            start = Math.min(start, monthList.length - count);
+            start = Math.max(0, start);
+            return { months: monthList.slice(start, start + count), selected: idx - start };
+        }
+
+        function renderMonthlyBars() {
+            const canvas = document.getElementById('monthlyBarChart');
+            if (!canvas || !canvas.offsetParent) return;
+
+            const win = monthlyWindow(12);
+            const months = win.months;
+            const selected = win.selected;
+            if (monthlyBarChart) { monthlyBarChart.destroy(); monthlyBarChart = null; }
+            if (months.length === 0) return;
+
+            const rows = months.map(m => periodTotals(m));
+            const labels = months.map(m => {
+                const p = m.split('/');
+                return Number(p[1]) === 1 ? `${p[0].slice(2)}/1` : `${Number(p[1])}`;
+            });
+            // 選択中の月だけ濃く塗って位置が分かるようにする
+            const shade = (rgb) => months.map((m, i) =>
+                `rgba(${rgb},${i === selected ? 0.95 : 0.35})`);
+
+            monthlyBarChart = new Chart(canvas.getContext('2d'), {
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'bar', label: '収入', data: rows.map(r => r.income),
+                            backgroundColor: shade('48,209,88'), borderRadius: 3,
+                            categoryPercentage: 0.7, barPercentage: 0.9, order: 2
+                        },
+                        {
+                            type: 'bar', label: '支出', data: rows.map(r => r.expense),
+                            backgroundColor: shade('255,69,58'), borderRadius: 3,
+                            categoryPercentage: 0.7, barPercentage: 0.9, order: 2
+                        },
+                        {
+                            type: 'line', label: '収支', data: rows.map(r => r.net),
+                            borderColor: '#eceef3', borderWidth: 1.5,
+                            pointRadius: 2, pointBackgroundColor: '#eceef3',
+                            pointHoverRadius: 4, tension: 0.25, order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    animation: { duration: 700, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: {
+                            display: true, position: 'bottom',
+                            labels: {
+                                color: '#98989f', boxWidth: 8, boxHeight: 8,
+                                usePointStyle: true, pointStyle: 'circle',
+                                font: { size: 10 }, padding: 12
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(28,28,30,0.96)',
+                            bodyColor: '#ffffff', titleColor: '#98989f',
+                            borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1,
+                            padding: 10, cornerRadius: 10,
+                            callbacks: {
+                                title: (items) => {
+                                    const p = months[items[0].dataIndex].split('/');
+                                    return `${p[0]}年${Number(p[1])}月`;
+                                },
+                                label: (c) => ' ' + c.dataset.label + ' ' + yen(c.parsed.y)
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            border: { display: false },
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 10 }, maxRotation: 0,
+                                color: (c) => c.index === selected ? '#ffffff' : '#98989f'
+                            }
+                        },
+                        y: {
+                            border: { display: false },
+                            grid: { color: 'rgba(255,255,255,0.06)' },
+                            ticks: {
+                                color: '#98989f', font: { size: 10 }, padding: 4,
+                                maxTicksLimit: 5, callback: (v) => formatMan(v)
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function setCalendarMode(mode) {
@@ -628,6 +767,7 @@
                     span.classList.add('active');
                     span.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                     renderSummaryData();
+                    renderMonthlyBars();
                 };
                 nav.appendChild(span);
             });
@@ -731,13 +871,138 @@
 
         /* カテゴリ詳細 */
 
+        function isDetailOpen() {
+            return document.getElementById('detail-sheet').classList.contains('open');
+        }
+
+        function openSheetEl() {
+            document.getElementById('detail-sheet').classList.add('open');
+            document.body.classList.add('sheet-open');
+        }
+
+        function setSheetFoot(html) {
+            const foot = document.getElementById('sheet-foot');
+            foot.innerHTML = html || '';
+            foot.style.display = html ? 'block' : 'none';
+        }
+
+        function openSheet(title, html, context, footHtml) {
+            sheetContext = context || null;
+            document.getElementById('detail-category-title').textContent = title;
+            const body = document.getElementById('detail-list-content');
+            body.innerHTML = html;
+            body.scrollTop = 0;
+            setSheetFoot(footHtml);
+            openSheetEl();
+        }
+
         function showDetailView(categoryName) {
             currentDetailCategory = categoryName;
-            showScreen('detail');
+            sheetContext = { type: 'category', name: categoryName };
+            renderDetailList(categoryName);
+            setSheetFoot('');
+            openSheetEl();
+        }
+
+        function openKakeiboFor(month, tab) {
+            calendarMode = 'month';
+            currentSelection = month;
+            if (tab) currentTab = tab;
+            showScreen('kakeibo');
         }
 
         function closeDetailView() {
-            showScreen('kakeibo');
+            document.getElementById('detail-sheet').classList.remove('open');
+            document.body.classList.remove('sheet-open');
+            sheetContext = null;
+        }
+
+        // ポップアップを開いたままデータが更新されたときに中身を作り直す
+        function refreshSheet() {
+            if (!sheetContext) return;
+            if (sheetContext.type === 'category') renderDetailList(sheetContext.name);
+            else if (sheetContext.type === 'breakdown') showMonthBreakdown(sheetContext.kind);
+        }
+
+        function kakeiboButton(month, monthLabel, tab) {
+            return `<button class="sheet-action" onclick="openKakeiboFor('${month}','${tab}')">
+                        家計簿で${monthLabel}を見る <i class="fa-solid fa-chevron-right"></i>
+                    </button>`;
+        }
+
+        function showMonthBreakdown(kind) {
+            const month = monthList.length ? monthList[monthList.length - 1] : formatDateYM(new Date());
+            const p = month.split('/');
+            const monthLabel = `${p[0]}年${Number(p[1])}月`;
+            const totals = periodTotals(month);
+            const prev = periodTotals(getPreviousPeriodKey(month, 'month'));
+            const ctx = { type: 'breakdown', kind };
+
+            if (kind === 'net') {
+                const paceInfo = monthlyPace(PACE_MONTHS);
+                const rows = [
+                    ['収入', yen(totals.income), 'pos'],
+                    ['支出', yen(totals.expense), 'neg'],
+                    ['収支', signedYen(totals.net), totals.net >= 0 ? 'pos' : 'neg']
+                ];
+                if (totals.income > 0) {
+                    const rate = totals.net / totals.income * 100;
+                    rows.push(['貯蓄率', rate.toFixed(1) + '%', rate >= 0 ? 'pos' : 'neg']);
+                }
+                if (prev.count > 0) {
+                    const d = totals.net - prev.net;
+                    rows.push(['前月比', signedYen(d), d >= 0 ? 'pos' : 'neg']);
+                }
+                rows.push([`直近${paceInfo.months}ヶ月の平均`, signedYen(paceInfo.pace),
+                        paceInfo.pace >= 0 ? 'pos' : 'neg']);
+                const vsAvg = totals.net - paceInfo.pace;
+                rows.push(['平均との差', signedYen(vsAvg), vsAvg >= 0 ? 'pos' : 'neg']);
+
+                openSheet(`${monthLabel}の収支`, `<div class="sheet-section">${kvRows(rows)}</div>`,
+                        ctx, kakeiboButton(month, monthLabel, ''));
+                return;
+            }
+
+            const total = kind === '収入' ? totals.income : totals.expense;
+            const prevTotal = kind === '収入' ? prev.income : prev.expense;
+            const entries = globalData.filter(d => d.date && d.date.startsWith(month) && d.type === kind);
+            const cats = groupByCategory(entries, kind);
+
+            const summary = [['合計', yen(total)], ['件数', entries.length + '件']];
+            if (prev.count > 0) {
+                const diff = total - prevTotal;
+                const good = kind === '収入' ? diff >= 0 : diff <= 0;
+                summary.push(['前月比', signedYen(diff), good ? 'pos' : 'neg']);
+            }
+            if (cats.length > 0 && total > 0) {
+                const top = cats[0];
+                summary.push(['最も大きい項目',
+                    `${top.name}（${(top.data.total / total * 100).toFixed(0)}%）`]);
+            }
+
+            const list = cats.length === 0
+                ? '<div class="no-data">データがありません</div>'
+                : cats.map((c, i) => {
+                    const pct = total > 0 ? (c.data.total / total * 100) : 0;
+                    const color = getColorForCategory(c.name, i, kind);
+                    return `
+                    <div class="bd-row">
+                        <div class="bd-line">
+                            <span class="bd-name">${escapeHtml(c.name)}</span>
+                            <span class="bd-amount">${yen(c.data.total)}<em>${pct.toFixed(1)}%</em></span>
+                        </div>
+                        <div class="bd-bar"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>
+                    </div>`;
+                }).join('');
+
+            openSheet(`${monthLabel}の${kind}`,
+                `<div class="sheet-section">${kvRows(summary)}</div>
+                <div class="sheet-section bd-list">${list}</div>`,
+                ctx, kakeiboButton(month, monthLabel, kind));
+        }
+
+        function onSheetBackdrop(event) {
+            if (event.target === event.currentTarget) closeDetailView();
         }
 
         function renderDetailList(categoryName) {
@@ -767,6 +1032,132 @@
                     </div>
                     <div class="tx-amount" style="color:${color}">${yen(d.amount)}</div>
                 </div>`).join('');
+        }
+
+        /* 目標 */
+
+        function loadGoal() {
+            try { return JSON.parse(localStorage.getItem(GOAL_KEY)) || {}; }
+            catch (e) { return {}; }
+        }
+
+        function onGoalInput() {
+            const amount = Number(document.getElementById('goal-amount').value) || 0;
+            const month = document.getElementById('goal-month').value || '';
+            localStorage.setItem(GOAL_KEY, JSON.stringify({ amount, month }));
+            renderGoalResult();
+        }
+
+        // 直近 n ヶ月の平均月次収支＝現在の貯蓄ペース
+        function monthlyPace(n) {
+            const months = monthList.slice(-n);
+            if (months.length === 0) return { pace: 0, months: 0 };
+            const total = months.reduce((s, m) => s + periodTotals(m).net, 0);
+            return { pace: Math.round(total / months.length), months: months.length };
+        }
+
+        function monthsUntil(targetMonth) {
+            const parts = targetMonth.split('-').map(Number);
+            const now = new Date();
+            return (parts[0] - now.getFullYear()) * 12 + (parts[1] - (now.getMonth() + 1));
+        }
+
+        function monthLabelAfter(count) {
+            const d = new Date();
+            d.setMonth(d.getMonth() + count);
+            return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+        }
+
+        function signedYen(v) {
+            return (v >= 0 ? '+' : '-') + yen(Math.abs(Math.round(v)));
+        }
+
+        function renderGoal() {
+            const goal = loadGoal();
+            const amountEl = document.getElementById('goal-amount');
+            const monthEl = document.getElementById('goal-month');
+            // 入力中の値を上書きしない
+            if (document.activeElement !== amountEl) amountEl.value = goal.amount || '';
+            if (document.activeElement !== monthEl) monthEl.value = goal.month || '';
+            animateValue('goal-balance', 0, currentBalance(), 800, yen);
+            renderGoalResult();
+        }
+
+        function kvRows(rows) {
+            return rows.map(r =>
+                `<div class="kv"><span>${r[0]}</span><span class="${r[2] || ''}">${r[1]}</span></div>`
+            ).join('');
+        }
+
+        function renderGoalResult() {
+            const goal = loadGoal();
+            const balance = currentBalance();
+            const resultEl = document.getElementById('goal-result');
+            const textEl = document.getElementById('goal-progress-text');
+            const barEl = document.getElementById('goal-progress-bar');
+
+            if (!goal.amount || goal.amount <= 0) {
+                textEl.textContent = '目標を設定してください';
+                barEl.style.width = '0%';
+                resultEl.innerHTML = '';
+                return;
+            }
+
+            const remaining = goal.amount - balance;
+            const ratio = Math.max(0, Math.min(100, balance / goal.amount * 100));
+            barEl.style.width = ratio.toFixed(1) + '%';
+            textEl.textContent = `目標 ${yen(goal.amount)} の ${ratio.toFixed(1)}%`;
+
+            if (remaining <= 0) {
+                resultEl.innerHTML = `
+                    <div class="card card-mt">
+                        <div class="verdict ok">目標を達成しています</div>
+                        ${kvRows([['目標を超えた分', signedYen(-remaining), 'pos']])}
+                    </div>`;
+                return;
+            }
+
+            const paceInfo = monthlyPace(PACE_MONTHS);
+            const pace = paceInfo.pace;
+            const note = `<div class="kv-note">直近${paceInfo.months}ヶ月の平均収支から算出</div>`;
+
+            // 時期を決めている場合は「必要なペース」と間に合うかを出す
+            if (goal.month && monthsUntil(goal.month) > 0) {
+                const left = monthsUntil(goal.month);
+                const required = Math.ceil(remaining / left);
+                const projected = balance + pace * left;
+                const gap = projected - goal.amount;
+                const ok = gap >= 0;
+
+                resultEl.innerHTML = `
+                    <div class="card card-mt">
+                        <div class="verdict ${ok ? 'ok' : 'ng'}">${ok ? '今のペースで間に合う見込みです' : '今のペースでは届きません'}</div>
+                        ${kvRows([
+                            ['目標まで', yen(remaining)],
+                            ['残り期間', `${left}ヶ月`],
+                            ['必要なペース', `月 ${yen(required)}`],
+                            ['現在のペース', `月 ${signedYen(pace)}`, pace >= 0 ? 'pos' : 'neg'],
+                            [ok ? '毎月の余裕' : '毎月の不足', signedYen(gap / left), ok ? 'pos' : 'neg'],
+                            ['到達見込み額', yen(Math.round(projected)), ok ? 'pos' : 'neg']
+                        ])}
+                        ${note}
+                    </div>`;
+                return;
+            }
+
+            const expired = goal.month && monthsUntil(goal.month) <= 0;
+            const rows = [['目標まで', yen(remaining)]];
+            if (expired) rows.push(['設定した時期', '過ぎています', 'neg']);
+            rows.push(['現在のペース', `月 ${signedYen(pace)}`, pace >= 0 ? 'pos' : 'neg']);
+            rows.push(pace > 0
+                ? ['到達見込み', `${monthLabelAfter(Math.ceil(remaining / pace))}ごろ`]
+                : ['到達見込み', '現在のペースでは到達しません', 'neg']);
+
+            resultEl.innerHTML = `
+                <div class="card card-mt">
+                    ${kvRows(rows)}
+                    ${note}
+                </div>`;
         }
 
         /* 資産 */
@@ -867,31 +1258,17 @@
             });
         }
 
-        function niceStep(rough) {
-            if (!(rough > 0)) return 1000;
-            const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-            const norm = rough / mag;
-            const nice = norm <= 1 ? 1
-                : norm <= 1.5 ? 1.5
-                : norm <= 2 ? 2
-                : norm <= 2.5 ? 2.5
-                : norm <= 3 ? 3
-                : norm <= 4 ? 4
-                : norm <= 5 ? 5
-                : norm <= 7.5 ? 7.5
-                : 10;
-            return nice * mag;
-        }
+        const AXIS_STEP = 200000;
+        const AXIS_DEFAULT_MAX = 1000000;
 
         function axisRange(values) {
-            if (!values.length) return { min: 0, max: 1000, step: 500 };
+            if (!values.length) return { min: 0, max: AXIS_DEFAULT_MAX, step: AXIS_STEP };
             const minV = Math.min(...values, 0);
             const maxV = Math.max(...values, 0);
-            const step = niceStep((maxV - minV) / 4);
             return {
-                min: Math.floor(minV / step) * step,
-                max: Math.ceil(maxV / step) * step,
-                step
+                min: Math.min(0, Math.floor(minV / AXIS_STEP) * AXIS_STEP),
+                max: Math.max(AXIS_DEFAULT_MAX, Math.ceil(maxV / AXIS_STEP) * AXIS_STEP),
+                step: AXIS_STEP
             };
         }
 
@@ -1000,6 +1377,11 @@
         /* 初期化 */
 
         document.getElementById('trendScrollContainer').addEventListener('scroll', onTrendScroll, { passive: true });
+        document.getElementById('goal-amount').addEventListener('input', onGoalInput);
+        document.getElementById('goal-month').addEventListener('change', onGoalInput);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isDetailOpen()) closeDetailView();
+        });
 
         showScreen('home');
 
